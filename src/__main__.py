@@ -1,0 +1,7 @@
+"""Запуск приложения командой python -m src."""
+
+from .cli import main
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
