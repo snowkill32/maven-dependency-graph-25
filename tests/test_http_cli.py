@@ -95,3 +95,11 @@ class HttpCliTests(unittest.TestCase):
         self.assertEqual(result.stdout, "")
         self.assertIn("XML", result.stderr)
         self.assertNotIn("Traceback", result.stderr)
+
+    def test_unknown_xml_encoding(self):
+        """Неверная кодировка полученного POM дает код 1 без traceback."""
+        result = self.run_cli("g:encoding:1")
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout, "")
+        self.assertIn("XML POM", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)

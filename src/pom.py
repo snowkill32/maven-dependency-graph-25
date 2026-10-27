@@ -76,7 +76,7 @@ def parse_pom(content: bytes) -> Pom:
     """Разобрать POM 4.0.0; некорректный документ вызывает ValueError."""
     try:
         root = ElementTree.fromstring(content)
-    except ElementTree.ParseError as error:
+    except (ElementTree.ParseError, LookupError, ValueError) as error:
         raise ValueError(f"не удалось разобрать XML POM: {error}") from error
     if root.tag not in {"project", f"{{{MAVEN_NAMESPACE}}}project"}:
         raise ValueError("корневой элемент POM должен быть project")

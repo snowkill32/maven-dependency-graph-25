@@ -81,3 +81,12 @@ class PomTests(unittest.TestCase):
             with self.subTest(content=content):
                 with self.assertRaisesRegex(ValueError, message):
                     parse_pom(content)
+
+    def test_unknown_or_unsupported_xml_encoding(self):
+        """Неверная кодировка XML обрабатывается как ошибка данных POM."""
+        for encoding in ("unknown-charset", "UTF-32"):
+            with self.subTest(encoding=encoding):
+                content = (f'<?xml version="1.0" encoding="{encoding}"?>'
+                           '<project/>').encode()
+                with self.assertRaisesRegex(ValueError, "XML POM"):
+                    parse_pom(content)
