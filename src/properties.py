@@ -18,7 +18,9 @@ def expand(value: str, properties: dict, trail: tuple = ()) -> str:
         """Раскрыть одно свойство, сохраняя цепочку для проверки цикла."""
         name = match.group(1)
         if name in trail or len(trail) >= MAX_PROPERTY_DEPTH:
-            raise ValueError(f"циклическое или слишком вложенное свойство {name}")
+            raise ValueError(
+                f"циклическое или слишком вложенное свойство {name}"
+            )
         if name not in properties:
             raise ValueError(f"неизвестное свойство POM: ${{{name}}}")
         return expand(properties[name], properties, (*trail, name))
@@ -55,7 +57,9 @@ def merge_dependency(base: Dependency, own: Dependency) -> Dependency:
     })
 
 
-def complete_dependency(dependency: Dependency, managed: Dependency) -> Dependency:
+def complete_dependency(
+    dependency: Dependency, managed: Dependency,
+) -> Dependency:
     """Применить управление и значения по умолчанию; проверить результат."""
     result = merge_dependency(managed, dependency)
     values = {item.name: getattr(result, item.name) for item in fields(result)}
@@ -69,5 +73,7 @@ def complete_dependency(dependency: Dependency, managed: Dependency) -> Dependen
     if result.scope not in SCOPES:
         raise ValueError(f"неподдерживаемый scope: {result.scope}")
     if result.optional not in {"true", "false"}:
-        raise ValueError(f"optional должен быть true или false: {result.optional}")
+        raise ValueError(
+            f"optional должен быть true или false: {result.optional}"
+        )
     return result
