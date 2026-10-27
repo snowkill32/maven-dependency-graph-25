@@ -11,6 +11,7 @@ dist/
 .idea/
 .vscode/
 tmp/
+output/
 *.zip
 *.exe
 *.dll
