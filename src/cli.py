@@ -2,15 +2,18 @@
 
 import argparse
 from collections.abc import Sequence
+import sys
 
 from .config import Config, validate_config
+from .pom import Dependency
+from .repository import get_direct_dependencies
 
 
 def build_parser() -> argparse.ArgumentParser:
     """Создать парсер четырех пользовательских параметров."""
     parser = argparse.ArgumentParser(
         prog="maven-dependency-graph",
-        description="Вариант 25, этап 1: проверка и вывод конфигурации.",
+        description="Вариант 25, этап 2: прямые зависимости пакета Maven.",
         allow_abbrev=False,
     )
     parser.add_argument(
@@ -23,7 +26,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--test-mode", action="store_true",
-        help="использовать локальный файл тестового репозитория",
+        help="проверить локальную конфигурацию этапа 1 (граф будет на этапе 3)",
     )
     parser.add_argument(
         "--ascii-tree", action="store_true",
@@ -56,8 +59,32 @@ def format_config(config: Config) -> str:
     )
 
 
+def format_dependencies(package: str, dependencies: list[Dependency]) -> str:
+    """Сформировать плоский список всех прямых зависимостей пакета."""
+    lines = [f"Прямые зависимости {package}:"]
+    if not dependencies:
+        lines.append("Прямых зависимостей нет.")
+    for dependency in dependencies:
+        details = [f"scope={dependency.scope}", f"type={dependency.type}"]
+        if dependency.classifier:
+            details.append(f"classifier={dependency.classifier}")
+        details.append(f"optional={dependency.optional}")
+        lines.append(f"- {dependency.coordinates} [{', '.join(details)}]")
+    return "\n".join(lines)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
-    """Проверить конфигурацию и вывести ее; вернуть код успеха 0."""
+    """Вывести зависимости либо конфигурацию тестового режима этапа 1."""
     config = parse_config(argv)
-    print(format_config(config))
+    if config.test_mode:
+        print(format_config(config))
+        return 0
+    try:
+        dependencies = get_direct_dependencies(
+            config.package, config.repository,
+        )
+    except ValueError as error:
+        print(f"Ошибка: {error}", file=sys.stderr)
+        return 1
+    print(format_dependencies(config.package, dependencies))
     return 0

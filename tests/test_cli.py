@@ -7,8 +7,9 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
-from src.cli import format_config, main, parse_config
+from src.cli import format_config, format_dependencies, main, parse_config
 from src.config import Config
+from src.pom import Dependency
 
 
 class CliTests(unittest.TestCase):
@@ -70,12 +71,54 @@ class CliTests(unittest.TestCase):
         )
 
     def test_main_output(self):
-        """Успешный запуск возвращает 0 и печатает конфигурацию."""
+        """Обычный запуск печатает список зависимостей вместо конфигурации."""
+        output = StringIO()
+        with patch("src.cli.get_direct_dependencies", return_value=[]):
+            with redirect_stdout(output):
+                self.assertEqual(main(self.normal_args), 0)
+        self.assertEqual(output.getvalue(),
+                         "Прямые зависимости org.example:demo:1.0:\n"
+                         "Прямых зависимостей нет.\n")
+
+    def test_test_mode_keeps_configuration_output(self):
+        """Тестовый режим пока проверяет только параметры первого этапа."""
         output = StringIO()
         with redirect_stdout(output):
-            self.assertEqual(main(self.normal_args), 0)
-        expected = format_config(parse_config(self.normal_args)) + "\n"
+            self.assertEqual(main(self.test_args), 0)
+        expected = format_config(parse_config(self.test_args)) + "\n"
         self.assertEqual(output.getvalue(), expected)
+
+    def test_runtime_failure(self):
+        """Ошибка получения POM дает код 1 и не оставляет частичный вывод."""
+        output, errors = StringIO(), StringIO()
+        with patch("src.cli.get_direct_dependencies",
+                   side_effect=ValueError("POM не найден")):
+            with redirect_stdout(output), redirect_stderr(errors):
+                self.assertEqual(main(self.normal_args), 1)
+        self.assertEqual(output.getvalue(), "")
+        self.assertIn("POM не найден", errors.getvalue())
+
+    def test_dependency_output_includes_scope_optional_and_classifier(self):
+        """Вывод различает тестовые и необязательные зависимости."""
+        dependency = Dependency("g", "lib", "2", "test", "test-jar",
+                                "tests", "true")
+        self.assertEqual(
+            format_dependencies("g:app:1", [dependency]),
+            "Прямые зависимости g:app:1:\n"
+            "- g:lib:2 [scope=test, type=test-jar, classifier=tests, "
+            "optional=true]",
+        )
+
+    def test_ascii_flag_does_not_hide_direct_dependencies(self):
+        """Настройка будущего дерева сохраняет плоский список этапа 2."""
+        output = StringIO()
+        dependency = Dependency("g", "lib", "2", "compile", "jar", "",
+                                "false")
+        with patch("src.cli.get_direct_dependencies",
+                   return_value=[dependency]):
+            with redirect_stdout(output):
+                self.assertEqual(main(self.normal_args + ["--ascii-tree"]), 0)
+        self.assertIn("g:lib:2", output.getvalue())
 
     def test_help(self):
         """Справка описывает все четыре опции и завершается с 0."""
