@@ -8,7 +8,7 @@ from urllib.parse import SplitResult, urlsplit
 
 
 MAVEN_PACKAGE = re.compile(
-    r"[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*:"
+    r"[A-Za-z0-9_][A-Za-z0-9_-]*(?:\.[A-Za-z0-9_-]+)*:"
     r"[A-Za-z0-9_][A-Za-z0-9_.-]*:"
     r"[A-Za-z0-9][A-Za-z0-9_.+-]*"
 )
