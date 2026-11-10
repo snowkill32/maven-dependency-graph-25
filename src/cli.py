@@ -3,7 +3,7 @@
 import argparse
 from collections.abc import Sequence
 
-from .config import Config
+from .config import Config, validate_config
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -33,14 +33,20 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def parse_config(argv: Sequence[str] | None = None) -> Config:
-    """Получить настройки из argv или из аргументов запущенного процесса."""
-    arguments = build_parser().parse_args(argv)
-    return Config(
+    """Прочитать и проверить настройки; ошибка дает stderr и код 2."""
+    parser = build_parser()
+    arguments = parser.parse_args(argv)
+    config = Config(
         package=arguments.package,
         repository=arguments.repository,
         test_mode=arguments.test_mode,
         ascii_tree=arguments.ascii_tree,
     )
+    try:
+        validate_config(config)
+    except ValueError as error:
+        parser.error(str(error))
+    return config
 
 
 def format_config(config: Config) -> str:
