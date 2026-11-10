@@ -8,6 +8,7 @@ import unittest
 from unittest.mock import patch
 
 from src.cli import main, parse_config
+from src.pom import Dependency
 
 
 class ConfigTests(unittest.TestCase):
@@ -40,14 +41,62 @@ class ConfigTests(unittest.TestCase):
         self.assertIn(message, errors.getvalue())
 
     def test_normal_output(self):
-        """Вывод содержит четыре параметра, оба флага по умолчанию false."""
+        """Обычный запуск показывает зависимости, полученные загрузчиком."""
         output = StringIO()
-        with redirect_stdout(output):
-            self.assertEqual(main(self.normal_args), 0)
+        with patch("src.cli.get_direct_dependencies",
+                   return_value=[Dependency("g", "lib", "1")]) as load:
+            with redirect_stdout(output):
+                self.assertEqual(main(self.normal_args), 0)
+        load.assert_called_once_with(
+            "junit:junit:4.13.2", "https://repo1.maven.org/maven2/",
+        )
         self.assertEqual(output.getvalue(),
-                         "package=junit:junit:4.13.2\n"
-                         "repository=https://repo1.maven.org/maven2/\n"
-                         "test_mode=false\nascii_tree=false\n")
+                         "Прямые зависимости junit:junit:4.13.2:\n"
+                         "  g:lib:1 scope=compile optional=false "
+                         "type=jar classifier=-\n")
+
+    def test_normal_empty_dependencies(self):
+        """Пакет без прямых зависимостей дает явное сообщение и успех."""
+        output = StringIO()
+        with patch("src.cli.get_direct_dependencies", return_value=[]):
+            with redirect_stdout(output):
+                self.assertEqual(main(self.normal_args), 0)
+        self.assertIn("нет прямых зависимостей", output.getvalue())
+
+    def test_download_error_has_no_partial_output(self):
+        """Ошибка получения POM дает stderr и код 1 без трассировки."""
+        output, errors = StringIO(), StringIO()
+        with patch("src.cli.get_direct_dependencies",
+                   side_effect=ValueError("POM не найден")):
+            with redirect_stdout(output), redirect_stderr(errors):
+                self.assertEqual(main(self.normal_args), 1)
+        self.assertEqual(output.getvalue(), "")
+        self.assertEqual(errors.getvalue(), "Ошибка: POM не найден\n")
+
+    def test_test_mode_does_not_load_maven(self):
+        """Настройки тестового режима по-прежнему проверяются без сети."""
+        output = StringIO()
+        with patch("src.cli.get_direct_dependencies") as load:
+            with redirect_stdout(output):
+                self.assertEqual(main(self.test_args), 0)
+        load.assert_not_called()
+        self.assertIn("package=A\n", output.getvalue())
+        self.assertIn("test_mode=true\n", output.getvalue())
+
+    def test_ascii_flag_does_not_change_stage_two_output(self):
+        """Флаг будущего дерева не меняет список прямых зависимостей."""
+        output = StringIO()
+        with patch("src.cli.get_direct_dependencies", return_value=[]):
+            with redirect_stdout(output):
+                result = main(self.normal_args + ["--ascii-tree"])
+        self.assertEqual(result, 0)
+        self.assertIn("нет прямых зависимостей", output.getvalue())
+
+    def test_default_flags_are_false(self):
+        """Оба флага остаются выключенными без указания в командной строке."""
+        config = parse_config(self.normal_args)
+        self.assertFalse(config.test_mode)
+        self.assertFalse(config.ascii_tree)
 
     def test_test_mode_with_ascii_and_path_with_spaces(self):
         """Тестовый режим принимает существующий путь с пробелами."""

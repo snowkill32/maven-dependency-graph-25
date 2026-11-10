@@ -1,16 +1,19 @@
-"""Опции командной строки и вывод настроек первого этапа."""
+"""Опции командной строки и вывод прямых зависимостей второго этапа."""
 
 import argparse
 from collections.abc import Sequence
+import sys
 
 from .config import Config, validate_config
+from .pom import Dependency
+from .repository import get_direct_dependencies
 
 
 def build_parser() -> argparse.ArgumentParser:
     """Описать две обязательные строковые настройки и два флага."""
     parser = argparse.ArgumentParser(
         prog="maven-dependency-graph",
-        description="Вариант 25, этап 1: настройки анализа зависимостей Maven.",
+        description="Вариант 25, этап 2: прямые зависимости Maven.",
         allow_abbrev=False,
     )
     parser.add_argument(
@@ -60,6 +63,31 @@ def format_config(config: Config) -> str:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Прочитать параметры и вывести конфигурацию приложения."""
-    print(format_config(parse_config(argv)))
+    """Вывести прямые зависимости; тестовый режим пока показывает настройки."""
+    config = parse_config(argv)
+    if config.test_mode:
+        print(format_config(config))
+        return 0
+    try:
+        dependencies = get_direct_dependencies(
+            config.package, config.repository,
+        )
+    except ValueError as error:
+        print(f"Ошибка: {error}", file=sys.stderr)
+        return 1
+    print(format_dependencies(config.package, dependencies))
     return 0
+
+
+def format_dependencies(package: str, dependencies: list[Dependency]) -> str:
+    """Вывести каждую прямую зависимость с ее областью и вариантами."""
+    lines = [f"Прямые зависимости {package}:"]
+    for item in dependencies:
+        lines.append(
+            f"  {item.coordinates} scope={item.scope} "
+            f"optional={str(item.optional).lower()} "
+            f"type={item.type} classifier={item.classifier or '-'}"
+        )
+    if not dependencies:
+        lines.append("  (нет прямых зависимостей)")
+    return "\n".join(lines)
