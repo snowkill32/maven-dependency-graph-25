@@ -88,7 +88,7 @@ class RepositoryTests(unittest.TestCase):
         """Данные ответа проходят через настоящий разбор POM."""
         with patch("src.repository.urlopen",
                    return_value=BytesIO(EXAMPLE.read_bytes())):
-            actual = get_direct_dependencies(PACKAGE, REPOSITORY)
+            actual = get_direct_dependencies("org.example:demo:1.0", REPOSITORY)
         self.assertEqual([item.coordinates for item in actual], [
             "org.sample:library:2.1", "junit:junit:4.13.2",
             "org.sample:extension:1.5",

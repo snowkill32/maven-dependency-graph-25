@@ -6,7 +6,8 @@ from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 from .config import validate_package, validate_url
-from .pom import Dependency, parse_pom
+from .pom import Dependency
+from .resolver import PomResolver
 
 
 NETWORK_TIMEOUT_SECONDS = 15
@@ -51,4 +52,5 @@ def download_pom(package: str, repository: str) -> bytes:
 
 def get_direct_dependencies(package: str, repository: str) -> list[Dependency]:
     """Получить прямые зависимости из загруженного POM без обхода графа."""
-    return parse_pom(download_pom(package, repository))
+    resolver = PomResolver(lambda name: download_pom(name, repository))
+    return resolver.direct_dependencies(package)
