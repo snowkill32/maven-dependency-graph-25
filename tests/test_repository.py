@@ -9,7 +9,7 @@ from urllib.error import HTTPError, URLError
 
 from src.repository import (
     MAX_POM_BYTES, NETWORK_TIMEOUT_SECONDS, download_pom,
-    get_direct_dependencies, pom_url,
+    get_dependency_graph, get_direct_dependencies, pom_url,
 )
 
 
@@ -99,3 +99,33 @@ class RepositoryTests(unittest.TestCase):
         with patch("src.repository.urlopen", return_value=BytesIO(b"broken")):
             with self.assertRaisesRegex(ValueError, "XML POM"):
                 get_direct_dependencies(PACKAGE, REPOSITORY)
+
+    def test_graph_reuses_parent_metadata(self):
+        """Общий родитель двух вершин скачивается один раз на весь обход."""
+        prefix = "<project><modelVersion>4.0.0</modelVersion>"
+        parent = (prefix + "<groupId>g</groupId><artifactId>parent</artifactId>"
+                  "<version>1</version></project>").encode()
+        reference = ("<parent><groupId>g</groupId>"
+                     "<artifactId>parent</artifactId>"
+                     "<version>1</version></parent>")
+        children = {}
+        declarations = []
+        for name in ("first", "second"):
+            children[f"g:{name}:1"] = (
+                prefix + reference
+                + f"<artifactId>{name}</artifactId></project>"
+            ).encode()
+            declarations.append("<dependency><groupId>g</groupId>"
+                                f"<artifactId>{name}</artifactId>"
+                                "<version>1</version></dependency>")
+        root = (prefix + "<groupId>g</groupId><artifactId>app</artifactId>"
+                "<version>1</version><dependencies>" + "".join(declarations)
+                + "</dependencies></project>").encode()
+        files = {"g:app:1": root, "g:parent:1": parent, **children}
+        with patch("src.repository.download_pom",
+                   side_effect=lambda package, base: files[package]) as load:
+            graph = get_dependency_graph("g:app:1", REPOSITORY)
+        self.assertEqual(graph, {"g:app:1": ["g:first:1", "g:second:1"],
+                                 "g:first:1": [], "g:second:1": []})
+        self.assertEqual([call.args[0] for call in load.call_args_list],
+                         ["g:app:1", "g:first:1", "g:parent:1", "g:second:1"])

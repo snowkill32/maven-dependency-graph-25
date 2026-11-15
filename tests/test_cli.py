@@ -8,7 +8,6 @@ import unittest
 from unittest.mock import patch
 
 from src.cli import main, parse_config
-from src.pom import Dependency
 
 
 class ConfigTests(unittest.TestCase):
@@ -41,32 +40,34 @@ class ConfigTests(unittest.TestCase):
         self.assertIn(message, errors.getvalue())
 
     def test_normal_output(self):
-        """Обычный запуск показывает зависимости, полученные загрузчиком."""
+        """Обычный запуск показывает граф, полученный от Maven-загрузчика."""
         output = StringIO()
-        with patch("src.cli.get_direct_dependencies",
-                   return_value=[Dependency("g", "lib", "1")]) as load:
+        graph = {"junit:junit:4.13.2": ["g:lib:1"], "g:lib:1": []}
+        with patch("src.cli.get_dependency_graph", return_value=graph) as load:
             with redirect_stdout(output):
                 self.assertEqual(main(self.normal_args), 0)
         load.assert_called_once_with(
             "junit:junit:4.13.2", "https://repo1.maven.org/maven2/",
         )
         self.assertEqual(output.getvalue(),
-                         "Прямые зависимости junit:junit:4.13.2:\n"
-                         "  g:lib:1 scope=compile optional=false "
-                         "type=jar classifier=-\n")
+                         "Граф зависимостей junit:junit:4.13.2:\n"
+                         "Порядок обхода BFS: junit:junit:4.13.2, g:lib:1\n"
+                         "junit:junit:4.13.2 -> g:lib:1\n"
+                         "g:lib:1 -> (нет зависимостей)\n")
 
     def test_normal_empty_dependencies(self):
         """Пакет без прямых зависимостей дает явное сообщение и успех."""
         output = StringIO()
-        with patch("src.cli.get_direct_dependencies", return_value=[]):
+        with patch("src.cli.get_dependency_graph",
+                   return_value={"junit:junit:4.13.2": []}):
             with redirect_stdout(output):
                 self.assertEqual(main(self.normal_args), 0)
-        self.assertIn("нет прямых зависимостей", output.getvalue())
+        self.assertIn("нет зависимостей", output.getvalue())
 
     def test_download_error_has_no_partial_output(self):
         """Ошибка получения POM дает stderr и код 1 без трассировки."""
         output, errors = StringIO(), StringIO()
-        with patch("src.cli.get_direct_dependencies",
+        with patch("src.cli.get_dependency_graph",
                    side_effect=ValueError("POM не найден")):
             with redirect_stdout(output), redirect_stderr(errors):
                 self.assertEqual(main(self.normal_args), 1)
@@ -74,23 +75,35 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(errors.getvalue(), "Ошибка: POM не найден\n")
 
     def test_test_mode_does_not_load_maven(self):
-        """Настройки тестового режима по-прежнему проверяются без сети."""
+        """Тестовый режим обходит JSON и не обращается к Maven-репозиторию."""
         output = StringIO()
-        with patch("src.cli.get_direct_dependencies") as load:
+        with patch("src.cli.get_dependency_graph") as load:
             with redirect_stdout(output):
                 self.assertEqual(main(self.test_args), 0)
         load.assert_not_called()
-        self.assertIn("package=A\n", output.getvalue())
-        self.assertIn("test_mode=true\n", output.getvalue())
+        self.assertEqual(output.getvalue(), "Граф зависимостей A:\n"
+                         "Порядок обхода BFS: A\nA -> (нет зависимостей)\n")
 
-    def test_ascii_flag_does_not_change_stage_two_output(self):
-        """Флаг будущего дерева не меняет список прямых зависимостей."""
+    def test_ascii_flag_does_not_change_stage_three_output(self):
+        """Флаг будущего дерева не меняет вывод графа третьего этапа."""
         output = StringIO()
-        with patch("src.cli.get_direct_dependencies", return_value=[]):
+        with patch("src.cli.get_dependency_graph",
+                   return_value={"junit:junit:4.13.2": []}):
             with redirect_stdout(output):
                 result = main(self.normal_args + ["--ascii-tree"])
         self.assertEqual(result, 0)
-        self.assertIn("нет прямых зависимостей", output.getvalue())
+        self.assertIn("нет зависимостей", output.getvalue())
+
+    def test_bad_test_data_has_exit_one(self):
+        """Ошибки JSON и отсутствие корня дают stderr без частичного графа."""
+        for content in ('{"B": []}', '{"A": [}'):
+            with self.subTest(content=content):
+                self.repository.write_text(content, encoding="utf-8")
+                output, errors = StringIO(), StringIO()
+                with redirect_stdout(output), redirect_stderr(errors):
+                    self.assertEqual(main(self.test_args), 1)
+                self.assertEqual(output.getvalue(), "")
+                self.assertIn("Ошибка:", errors.getvalue())
 
     def test_default_flags_are_false(self):
         """Оба флага остаются выключенными без указания в командной строке."""

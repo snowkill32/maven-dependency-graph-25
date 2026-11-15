@@ -6,6 +6,7 @@ from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 from .config import validate_package, validate_url
+from .graph import build_graph
 from .pom import Dependency
 from .resolver import PomResolver
 
@@ -54,3 +55,14 @@ def get_direct_dependencies(package: str, repository: str) -> list[Dependency]:
     """Получить прямые зависимости из загруженного POM без обхода графа."""
     resolver = PomResolver(lambda name: download_pom(name, repository))
     return resolver.direct_dependencies(package)
+
+
+def get_dependency_graph(package: str, repository: str) -> dict:
+    """Обойти Maven-пакеты через BFS с общим кэшем родительских POM и BOM."""
+    resolver = PomResolver(lambda name: download_pom(name, repository))
+
+    def load(name: str) -> list[str]:
+        """Прочитать координаты прямых зависимостей одной вершины."""
+        return [item.coordinates for item in resolver.direct_dependencies(name)]
+
+    return build_graph(package, load)

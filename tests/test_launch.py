@@ -21,7 +21,7 @@ class LaunchTests(unittest.TestCase):
         )
 
     def test_test_mode_process(self):
-        """Тестовый режим печатает все четыре значения и не пишет ошибок."""
+        """Тестовый режим печатает граф в BFS-порядке без обращения к сети."""
         result = self.run_cli([
             "--package", "A", "--repository", "examples/repository.json",
             "--test-mode", "--ascii-tree",
@@ -29,8 +29,22 @@ class LaunchTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         self.assertEqual(result.stderr, "")
         self.assertEqual(result.stdout,
-                         "package=A\nrepository=examples/repository.json\n"
-                         "test_mode=true\nascii_tree=true\n")
+                         "Граф зависимостей A:\n"
+                         "Порядок обхода BFS: A, B, C, D, E\n"
+                         "A -> B, C\nB -> D\nC -> D, E\n"
+                         "D -> (нет зависимостей)\nE -> (нет зависимостей)\n")
+
+    def test_cycle_process(self):
+        """Настоящий процесс сохраняет обратное ребро и завершается."""
+        result = self.run_cli([
+            "--package", "A", "--repository", "examples/cycle.json",
+            "--test-mode",
+        ])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stderr, "")
+        self.assertEqual(result.stdout, "Граф зависимостей A:\n"
+                         "Порядок обхода BFS: A, B, C\n"
+                         "A -> B\nB -> C\nC -> A\n")
 
     def test_invalid_configuration_process(self):
         """Неверный URL дает код 2, stderr и пустой stdout без traceback."""

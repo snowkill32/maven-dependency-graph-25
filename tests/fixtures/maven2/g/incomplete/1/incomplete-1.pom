@@ -1,0 +1,13 @@
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>g</groupId>
+  <artifactId>incomplete</artifactId>
+  <version>1</version>
+  <dependencies>
+    <dependency>
+      <groupId>g</groupId>
+      <artifactId>missing</artifactId>
+      <version>1</version>
+    </dependency>
+  </dependencies>
+</project>

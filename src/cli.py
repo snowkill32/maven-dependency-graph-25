@@ -1,19 +1,20 @@
-"""Опции командной строки и вывод прямых зависимостей второго этапа."""
+"""Опции командной строки и построение графа зависимостей третьего этапа."""
 
 import argparse
 from collections.abc import Sequence
 import sys
 
 from .config import Config, validate_config
-from .pom import Dependency
-from .repository import get_direct_dependencies
+from .graph import format_graph
+from .local_repository import get_test_graph
+from .repository import get_dependency_graph
 
 
 def build_parser() -> argparse.ArgumentParser:
     """Описать две обязательные строковые настройки и два флага."""
     parser = argparse.ArgumentParser(
         prog="maven-dependency-graph",
-        description="Вариант 25, этап 2: прямые зависимости Maven.",
+        description="Вариант 25, этап 3: граф зависимостей, BFS с рекурсией.",
         allow_abbrev=False,
     )
     parser.add_argument(
@@ -52,42 +53,16 @@ def parse_config(argv: Sequence[str] | None = None) -> Config:
     return config
 
 
-def format_config(config: Config) -> str:
-    """Сформировать четыре строки ключ=значение для первого этапа."""
-    return "\n".join((
-        f"package={config.package}",
-        f"repository={config.repository}",
-        f"test_mode={str(config.test_mode).lower()}",
-        f"ascii_tree={str(config.ascii_tree).lower()}",
-    ))
-
-
 def main(argv: Sequence[str] | None = None) -> int:
-    """Вывести прямые зависимости; тестовый режим пока показывает настройки."""
+    """Построить и вывести граф из Maven или тестового JSON-репозитория."""
     config = parse_config(argv)
-    if config.test_mode:
-        print(format_config(config))
-        return 0
     try:
-        dependencies = get_direct_dependencies(
-            config.package, config.repository,
-        )
+        if config.test_mode:
+            graph = get_test_graph(config.package, config.repository)
+        else:
+            graph = get_dependency_graph(config.package, config.repository)
     except ValueError as error:
         print(f"Ошибка: {error}", file=sys.stderr)
         return 1
-    print(format_dependencies(config.package, dependencies))
+    print(format_graph(config.package, graph))
     return 0
-
-
-def format_dependencies(package: str, dependencies: list[Dependency]) -> str:
-    """Вывести каждую прямую зависимость с ее областью и вариантами."""
-    lines = [f"Прямые зависимости {package}:"]
-    for item in dependencies:
-        lines.append(
-            f"  {item.coordinates} scope={item.scope} "
-            f"optional={str(item.optional).lower()} "
-            f"type={item.type} classifier={item.classifier or '-'}"
-        )
-    if not dependencies:
-        lines.append("  (нет прямых зависимостей)")
-    return "\n".join(lines)

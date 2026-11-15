@@ -1,0 +1,13 @@
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>g</groupId>
+  <artifactId>test-library</artifactId>
+  <version>4</version>
+  <dependencies>
+    <dependency>
+      <groupId>g</groupId>
+      <artifactId>shared</artifactId>
+      <version>1</version>
+    </dependency>
+  </dependencies>
+</project>
