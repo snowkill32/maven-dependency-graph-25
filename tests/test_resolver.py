@@ -39,10 +39,12 @@ class ResolverTests(unittest.TestCase):
 
     def test_parent_properties_and_inherited_dependencies(self):
         """Дочернее свойство меняет версию унаследованной зависимости."""
-        parent = model_xml("parent", """
+        parent = model_xml(
+            "parent", """
             <properties><lib.version>2</lib.version></properties>
             <dependencies>""" + declaration("lib", "${lib.version}")
-            + "</dependencies>")
+            + "</dependencies>",
+        )
         child = model_xml("app", parent_ref() + """
             <properties><lib.version>3</lib.version></properties>""")
         files = {"g:parent:1": parent, "g:app:1": child}
@@ -123,9 +125,11 @@ class ResolverTests(unittest.TestCase):
 
     def test_no_transitive_dependency_requests(self):
         """Зависимость выводится, но ее собственный POM не запрашивается."""
-        files = {"g:app:1": model_xml("app", "<dependencies>"
-                                    + declaration("unavailable", "1")
-                                    + "</dependencies>")}
+        body = (
+            "<dependencies>" + declaration("unavailable", "1")
+            + "</dependencies>"
+        )
+        files = {"g:app:1": model_xml("app", body)}
         result = PomResolver(files.__getitem__).direct_dependencies("g:app:1")
         self.assertEqual(result[0].coordinates, "g:unavailable:1")
 
