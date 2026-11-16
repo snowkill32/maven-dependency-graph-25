@@ -30,9 +30,10 @@ class LaunchTests(unittest.TestCase):
         self.assertEqual(result.stderr, "")
         self.assertEqual(result.stdout,
                          "Граф зависимостей A:\n"
-                         "Порядок обхода BFS: A, B, C, D, E\n"
-                         "A -> B, C\nB -> D\nC -> D, E\n"
-                         "D -> (нет зависимостей)\nE -> (нет зависимостей)\n")
+                         "A\n+-- B\n|   \\-- D (нет зависимостей)\n"
+                         "\\-- C\n    +-- D [уже показан выше]\n"
+                         "    \\-- E (нет зависимостей)\n\n"
+                         "Порядок обхода BFS: A, B, C, D, E\n")
 
     def test_cycle_process(self):
         """Настоящий процесс сохраняет обратное ребро и завершается."""
@@ -43,8 +44,8 @@ class LaunchTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stderr, "")
         self.assertEqual(result.stdout, "Граф зависимостей A:\n"
-                         "Порядок обхода BFS: A, B, C\n"
-                         "A -> B\nB -> C\nC -> A\n")
+                         "A\n└── B\n    └── C\n        └── A [цикл]\n\n"
+                         "Порядок обхода BFS: A, B, C\n")
 
     def test_invalid_configuration_process(self):
         """Неверный URL дает код 2, stderr и пустой stdout без traceback."""

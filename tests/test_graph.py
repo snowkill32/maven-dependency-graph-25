@@ -77,5 +77,38 @@ class GraphTests(unittest.TestCase):
         """Текст показывает порядок обхода, цикл и вершину без соседей."""
         self.assertEqual(format_graph("A", {"A": ["A", "B"], "B": []}),
                          "Граф зависимостей A:\n"
-                         "Порядок обхода BFS: A, B\n"
-                         "A -> A, B\nB -> (нет зависимостей)")
+                         "A\n├── A [цикл]\n└── B (нет зависимостей)\n\n"
+                         "Порядок обхода BFS: A, B")
+
+    def test_shared_node_is_referenced_without_false_cycle(self):
+        """Общая зависимость отличима от цикла и не раскрывается повторно."""
+        source = {"A": ["B", "C"], "B": ["D"], "C": ["D"], "D": []}
+        text = format_graph("A", source)
+        self.assertEqual(text, "Граф зависимостей A:\nA\n"
+                         "├── B\n│   └── D (нет зависимостей)\n"
+                         "└── C\n    └── D [уже показан выше]\n\n"
+                         "Порядок обхода BFS: A, B, C, D")
+        self.assertNotIn("[цикл]", text)
+
+    def test_ascii_connectors(self):
+        """ASCII-режим использует обычные символы для всех ветвей."""
+        text = format_graph("A", {"A": ["B", "C"], "B": [], "C": []}, True)
+        self.assertIn("+-- B (нет зависимостей)\n", text)
+        self.assertIn("\\-- C (нет зависимостей)\n", text)
+        self.assertNotIn("├", text)
+        self.assertNotIn("└", text)
+
+    def test_nested_cycle_is_marked_at_reference(self):
+        """В цикле нескольких узлов метка ставится на возврате к предку."""
+        text = format_graph("A", {"A": ["B"], "B": ["C"], "C": ["A"]})
+        self.assertIn("        └── A [цикл]", text)
+        self.assertEqual(text.count("[цикл]"), 1)
+
+    def test_deep_tree_does_not_recurse(self):
+        """Вывод глубокой цепочки не ограничен стеком вызовов Python."""
+        nodes = [str(index) for index in range(1100)]
+        graph = {node: [other] for node, other in zip(nodes, nodes[1:])}
+        graph[nodes[-1]] = []
+        text = format_graph(nodes[0], graph, True)
+        self.assertIn("\\-- 1099 (нет зависимостей)", text)
+        self.assertEqual(len(text.splitlines()), len(nodes) + 3)

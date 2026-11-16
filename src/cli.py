@@ -31,7 +31,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--ascii-tree", action="store_true",
-        help="включить настройку будущего вывода дерева (этап 5)",
+        help="использовать ASCII-символы вместо линий Unicode в схеме",
     )
     return parser
 
@@ -64,5 +64,5 @@ def main(argv: Sequence[str] | None = None) -> int:
     except ValueError as error:
         print(f"Ошибка: {error}", file=sys.stderr)
         return 1
-    print(format_graph(config.package, graph))
+    print(format_graph(config.package, graph, config.ascii_tree))
     return 0

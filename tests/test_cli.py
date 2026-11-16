@@ -51,9 +51,9 @@ class ConfigTests(unittest.TestCase):
         )
         self.assertEqual(output.getvalue(),
                          "Граф зависимостей junit:junit:4.13.2:\n"
-                         "Порядок обхода BFS: junit:junit:4.13.2, g:lib:1\n"
-                         "junit:junit:4.13.2 -> g:lib:1\n"
-                         "g:lib:1 -> (нет зависимостей)\n")
+                         "junit:junit:4.13.2\n"
+                         "└── g:lib:1 (нет зависимостей)\n\n"
+                         "Порядок обхода BFS: junit:junit:4.13.2, g:lib:1\n")
 
     def test_normal_empty_dependencies(self):
         """Пакет без прямых зависимостей дает явное сообщение и успех."""
@@ -82,17 +82,19 @@ class ConfigTests(unittest.TestCase):
                 self.assertEqual(main(self.test_args), 0)
         load.assert_not_called()
         self.assertEqual(output.getvalue(), "Граф зависимостей A:\n"
-                         "Порядок обхода BFS: A\nA -> (нет зависимостей)\n")
+                         "A (нет зависимостей)\n\nПорядок обхода BFS: A\n")
 
-    def test_ascii_flag_does_not_change_stage_three_output(self):
-        """Флаг будущего дерева не меняет вывод графа третьего этапа."""
+    def test_ascii_flag_selects_plain_connectors(self):
+        """Флаг ASCII меняет линии схемы без изменения графа и порядка BFS."""
         output = StringIO()
         with patch("src.cli.get_dependency_graph",
-                   return_value={"junit:junit:4.13.2": []}):
+                   return_value={"junit:junit:4.13.2": ["g:lib:1"],
+                                 "g:lib:1": []}):
             with redirect_stdout(output):
                 result = main(self.normal_args + ["--ascii-tree"])
         self.assertEqual(result, 0)
-        self.assertIn("нет зависимостей", output.getvalue())
+        self.assertIn("\\-- g:lib:1 (нет зависимостей)", output.getvalue())
+        self.assertNotIn("└──", output.getvalue())
 
     def test_bad_test_data_has_exit_one(self):
         """Ошибки JSON и отсутствие корня дают stderr без частичного графа."""
