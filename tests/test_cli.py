@@ -113,6 +113,34 @@ class ConfigTests(unittest.TestCase):
         self.assertFalse(config.test_mode)
         self.assertFalse(config.ascii_tree)
 
+    def test_load_order_mode(self):
+        """Режим этапа 4 ставит общие зависимости раньше их потребителей."""
+        self.repository.write_text(
+            '{"A":["B","C"],"B":["D"],"C":["D"],"D":[]}',
+            encoding="utf-8",
+        )
+        output = StringIO()
+        with redirect_stdout(output):
+            result = main(self.test_args + ["--load-order"])
+        self.assertEqual(result, 0)
+        self.assertEqual(output.getvalue(),
+                         "Порядок загрузки: D -> B -> C -> A\n")
+
+    def test_load_order_cycle(self):
+        """Цикл не выдается за допустимый порядок загрузки."""
+        self.repository.write_text('{"A":["A"]}', encoding="utf-8")
+        output, errors = StringIO(), StringIO()
+        with redirect_stdout(output), redirect_stderr(errors):
+            result = main(self.test_args + ["--load-order"])
+        self.assertEqual(result, 1)
+        self.assertEqual(output.getvalue(), "")
+        self.assertIn("цикл A -> A", errors.getvalue())
+
+    def test_output_modes_are_exclusive(self):
+        """Порядок загрузки и ASCII-дерево выбираются раздельно."""
+        self.assert_error(self.test_args + ["--load-order", "--ascii-tree"],
+                          "--ascii-tree")
+
     def test_test_mode_with_ascii_and_path_with_spaces(self):
         """Тестовый режим принимает существующий путь с пробелами."""
         config = parse_config(self.test_args + ["--ascii-tree"])

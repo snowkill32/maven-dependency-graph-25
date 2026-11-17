@@ -26,6 +26,7 @@ class Config:
     repository: str
     test_mode: bool = False
     ascii_tree: bool = False
+    load_order: bool = False
 
 
 def validate_package(package: str, test_mode: bool) -> None:
