@@ -1,0 +1,3 @@
+digraph "demo:comparison:jar:1" {
+	"demo:comparison:jar:1" -> "org.hamcrest:hamcrest-core:jar:1.3:compile" ;
+ }

@@ -1,4 +1,4 @@
-"""Проверка конфигурации и ошибок четырех параметров CLI."""
+"""Проверка конфигурации, режимов вывода и ошибок параметров CLI."""
 
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
@@ -124,6 +124,8 @@ class ConfigTests(unittest.TestCase):
         config = parse_config(self.normal_args)
         self.assertFalse(config.test_mode)
         self.assertFalse(config.ascii_tree)
+        self.assertFalse(config.no_open)
+        self.assertEqual(config.output, "output/graph.png")
 
     def test_output_path_and_no_open(self):
         """Путь передается рендереру, окно можно отключить для сервера."""
