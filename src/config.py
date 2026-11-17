@@ -27,6 +27,8 @@ class Config:
     test_mode: bool = False
     ascii_tree: bool = False
     load_order: bool = False
+    output: str = "output/graph.png"
+    no_open: bool = False
 
 
 def validate_package(package: str, test_mode: bool) -> None:
@@ -90,6 +92,8 @@ def validate_test_file(repository: str) -> None:
 def validate_config(config: Config) -> None:
     """Выбрать проверки пакета и репозитория по состоянию test_mode."""
     validate_package(config.package, config.test_mode)
+    if Path(config.output).suffix.lower() not in {".png", ".svg"}:
+        raise ValueError("--output: требуется файл .png или .svg")
     if not config.repository.strip():
         raise ValueError("--repository: значение не должно быть пустым")
     if config.test_mode:

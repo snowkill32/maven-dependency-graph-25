@@ -28,6 +28,13 @@ class ConfigTests(unittest.TestCase):
             "--package", "A", "--repository", str(self.repository),
             "--test-mode",
         ]
+        self.image = self.directory / "graph.png"
+        render = patch("src.cli.render_graph", return_value=self.image)
+        self.render = render.start()
+        self.addCleanup(render.stop)
+        opener = patch("src.cli.open_graph")
+        self.opener = opener.start()
+        self.addCleanup(opener.stop)
 
     def assert_error(self, arguments, message):
         """Проверить stderr, код 2 и отсутствие частичного результата."""
@@ -49,11 +56,13 @@ class ConfigTests(unittest.TestCase):
         load.assert_called_once_with(
             "junit:junit:4.13.2", "https://repo1.maven.org/maven2/",
         )
+        self.render.assert_called_once_with(
+            "junit:junit:4.13.2", graph, "output/graph.png",
+        )
+        self.opener.assert_called_once_with(self.image)
         self.assertEqual(output.getvalue(),
-                         "Граф зависимостей junit:junit:4.13.2:\n"
-                         "junit:junit:4.13.2\n"
-                         "└── g:lib:1 (нет зависимостей)\n\n"
-                         "Порядок обхода BFS: junit:junit:4.13.2, g:lib:1\n")
+                         f"Graphviz: {self.image.with_suffix('.dot')}\n"
+                         f"Изображение: {self.image}\n")
 
     def test_normal_empty_dependencies(self):
         """Пакет без прямых зависимостей дает явное сообщение и успех."""
@@ -62,7 +71,9 @@ class ConfigTests(unittest.TestCase):
                    return_value={"junit:junit:4.13.2": []}):
             with redirect_stdout(output):
                 self.assertEqual(main(self.normal_args), 0)
-        self.assertIn("нет зависимостей", output.getvalue())
+        self.assertEqual(self.render.call_args.args[1],
+                         {"junit:junit:4.13.2": []})
+        self.assertIn("Изображение:", output.getvalue())
 
     def test_download_error_has_no_partial_output(self):
         """Ошибка получения POM дает stderr и код 1 без трассировки."""
@@ -81,8 +92,8 @@ class ConfigTests(unittest.TestCase):
             with redirect_stdout(output):
                 self.assertEqual(main(self.test_args), 0)
         load.assert_not_called()
-        self.assertEqual(output.getvalue(), "Граф зависимостей A:\n"
-                         "A (нет зависимостей)\n\nПорядок обхода BFS: A\n")
+        self.assertEqual(self.render.call_args.args[1], {"A": []})
+        self.assertIn("Изображение:", output.getvalue())
 
     def test_ascii_flag_selects_plain_connectors(self):
         """Флаг ASCII меняет линии схемы без изменения графа и порядка BFS."""
@@ -95,6 +106,7 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(result, 0)
         self.assertIn("\\-- g:lib:1 (нет зависимостей)", output.getvalue())
         self.assertNotIn("└──", output.getvalue())
+        self.render.assert_not_called()
 
     def test_bad_test_data_has_exit_one(self):
         """Ошибки JSON и отсутствие корня дают stderr без частичного графа."""
@@ -140,6 +152,32 @@ class ConfigTests(unittest.TestCase):
         """Порядок загрузки и ASCII-дерево выбираются раздельно."""
         self.assert_error(self.test_args + ["--load-order", "--ascii-tree"],
                           "--ascii-tree")
+
+    def test_output_path_and_no_open(self):
+        """Путь передается рендереру, окно можно отключить для сервера."""
+        with redirect_stdout(StringIO()):
+            result = main(self.test_args + ["--output", str(self.image),
+                                            "--no-open"])
+        self.assertEqual(result, 0)
+        self.render.assert_called_once_with("A", {"A": []}, str(self.image))
+        self.opener.assert_not_called()
+
+    def test_invalid_output_format(self):
+        """Ошибочная настройка формата имеет код 2 до загрузки данных."""
+        for path in ("", "graph", "graph.pdf", "graph.dot"):
+            with self.subTest(path=path):
+                self.assert_error(self.normal_args + ["--output", path],
+                                  "--output")
+
+    def test_graphviz_error_is_reported(self):
+        """Проблема визуализации дает код 1 без частичного stdout."""
+        self.render.side_effect = ValueError("Graphviz не найден")
+        output, errors = StringIO(), StringIO()
+        with redirect_stdout(output), redirect_stderr(errors):
+            result = main(self.test_args)
+        self.assertEqual(result, 1)
+        self.assertEqual(output.getvalue(), "")
+        self.assertIn("Graphviz не найден", errors.getvalue())
 
     def test_test_mode_with_ascii_and_path_with_spaces(self):
         """Тестовый режим принимает существующий путь с пробелами."""
@@ -242,7 +280,8 @@ class ConfigTests(unittest.TestCase):
 
     def test_boolean_flags_reject_values(self):
         """Флаги включаются присутствием и не принимают true или false."""
-        for option in ("--test-mode", "--ascii-tree"):
+        for option in ("--test-mode", "--ascii-tree", "--load-order",
+                       "--no-open"):
             for value in ("true", "false"):
                 with self.subTest(option=option, value=value):
                     self.assert_error(
@@ -262,5 +301,5 @@ class ConfigTests(unittest.TestCase):
             main(["--help"])
         self.assertEqual(raised.exception.code, 0)
         for option in ("--package", "--repository", "--test-mode",
-                       "--ascii-tree"):
+                       "--ascii-tree", "--load-order", "--output", "--no-open"):
             self.assertIn(option, output.getvalue())

@@ -1,4 +1,4 @@
-"""Опции командной строки и построение графа зависимостей третьего этапа."""
+"""CLI анализа Maven, порядка загрузки и визуализации графа зависимостей."""
 
 import argparse
 from collections.abc import Sequence
@@ -9,13 +9,14 @@ from .graph import format_graph
 from .local_repository import get_test_graph
 from .order import format_load_order
 from .repository import get_dependency_graph
+from .visualization import open_graph, render_graph
 
 
 def build_parser() -> argparse.ArgumentParser:
     """Описать две обязательные строковые настройки и два флага."""
     parser = argparse.ArgumentParser(
         prog="maven-dependency-graph",
-        description="Вариант 25: граф Maven и порядок загрузки зависимостей.",
+        description="Вариант 25: граф Maven, порядок загрузки и Graphviz.",
         allow_abbrev=False,
     )
     parser.add_argument(
@@ -30,6 +31,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--test-mode", action="store_true",
         help="использовать локальный файл тестового репозитория",
     )
+    add_output_options(parser)
+    return parser
+
+
+def add_output_options(parser: argparse.ArgumentParser) -> None:
+    """Описать режимы ASCII и порядка загрузки, путь и открытие картинки."""
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument(
         "--ascii-tree", action="store_true",
@@ -39,7 +46,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--load-order", action="store_true",
         help="показать порядок загрузки: сначала зависимости, затем пакет",
     )
-    return parser
+    parser.add_argument(
+        "--output", default="output/graph.png",
+        help="путь к изображению .png или .svg; рядом сохраняется .dot",
+    )
+    parser.add_argument(
+        "--no-open", action="store_true",
+        help="сохранить изображение, не открывая окно просмотра",
+    )
 
 
 def parse_config(argv: Sequence[str] | None = None) -> Config:
@@ -52,12 +66,27 @@ def parse_config(argv: Sequence[str] | None = None) -> Config:
         test_mode=arguments.test_mode,
         ascii_tree=arguments.ascii_tree,
         load_order=arguments.load_order,
+        output=arguments.output,
+        no_open=arguments.no_open,
     )
     try:
         validate_config(config)
     except ValueError as error:
         parser.error(str(error))
     return config
+
+
+def display_result(config: Config, graph: dict) -> str:
+    """Выбрать текстовый режим или сохранить и открыть изображение Graphviz."""
+    if config.load_order:
+        return format_load_order(config.package, graph)
+    if config.ascii_tree:
+        return format_graph(config.package, graph, True)
+    image = render_graph(config.package, graph, config.output)
+    if not config.no_open:
+        open_graph(image)
+    return (f"Graphviz: {image.with_suffix('.dot')}\n"
+            f"Изображение: {image}")
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -68,10 +97,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             graph = get_test_graph(config.package, config.repository)
         else:
             graph = get_dependency_graph(config.package, config.repository)
-        if config.load_order:
-            output = format_load_order(config.package, graph)
-        else:
-            output = format_graph(config.package, graph, config.ascii_tree)
+        output = display_result(config, graph)
     except ValueError as error:
         print(f"Ошибка: {error}", file=sys.stderr)
         return 1

@@ -51,7 +51,7 @@ class HttpCliTests(unittest.TestCase):
         """Выполнить точку входа отдельным процессом с тайм-аутом."""
         return subprocess.run(
             [sys.executable, "-X", "utf8", "-m", "src", "--package", package,
-             "--repository", self.base],
+             "--repository", self.base, "--ascii-tree"],
             cwd=PROJECT_ROOT, text=True, encoding="utf-8",
             capture_output=True, timeout=10, check=False,
         )
@@ -63,11 +63,11 @@ class HttpCliTests(unittest.TestCase):
         self.assertEqual(result.stderr, "")
         self.assertEqual(result.stdout,
                          "Граф зависимостей g:app:1:\n"
-                         "g:app:1\n├── g:test-library:4\n"
-                         "│   └── g:shared:1 (нет зависимостей)\n"
-                         "├── g:library:2.5\n"
-                         "│   └── g:shared:1 [уже показан выше]\n"
-                         "└── g:extension:3.1\n    └── g:app:1 [цикл]\n\n"
+                         "g:app:1\n+-- g:test-library:4\n"
+                         "|   \\-- g:shared:1 (нет зависимостей)\n"
+                         "+-- g:library:2.5\n"
+                         "|   \\-- g:shared:1 [уже показан выше]\n"
+                         "\\-- g:extension:3.1\n    \\-- g:app:1 [цикл]\n\n"
                          "Порядок обхода BFS: g:app:1, g:test-library:4, "
                          "g:library:2.5, g:extension:3.1, g:shared:1\n")
         self.assertEqual(RepositoryHandler.paths, [

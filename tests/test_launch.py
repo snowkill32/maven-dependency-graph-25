@@ -39,12 +39,12 @@ class LaunchTests(unittest.TestCase):
         """Настоящий процесс сохраняет обратное ребро и завершается."""
         result = self.run_cli([
             "--package", "A", "--repository", "examples/cycle.json",
-            "--test-mode",
+            "--test-mode", "--ascii-tree",
         ])
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stderr, "")
         self.assertEqual(result.stdout, "Граф зависимостей A:\n"
-                         "A\n└── B\n    └── C\n        └── A [цикл]\n\n"
+                         "A\n\\-- B\n    \\-- C\n        \\-- A [цикл]\n\n"
                          "Порядок обхода BFS: A, B, C\n")
 
     def test_invalid_configuration_process(self):

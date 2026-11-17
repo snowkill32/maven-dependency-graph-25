@@ -2,6 +2,7 @@
 
 from pathlib import Path
 import subprocess
+import sys
 from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
@@ -51,7 +52,8 @@ class VisualizationTests(unittest.TestCase):
             return subprocess.CompletedProcess(arguments, 0, "", "")
 
         with patch("src.visualization.graphviz_executable", return_value="dot"):
-            with patch("src.visualization.subprocess.run", side_effect=run) as p:
+            process = patch("src.visualization.subprocess.run", side_effect=run)
+            with process as p:
                 result = render_graph("A", {"A": []}, str(self.output))
                 self.assertEqual(result, self.output)
         self.assertEqual(p.call_args.args[0],
@@ -99,3 +101,21 @@ class VisualizationTests(unittest.TestCase):
         self.assertTrue(png.read_bytes().startswith(b"\x89PNG\r\n\x1a\n"))
         svg = render_graph("A", graph, str(self.output.with_suffix(".svg")))
         self.assertIn("<svg", svg.read_text(encoding="utf-8"))
+
+    def test_real_cli_image_without_viewer(self):
+        """CLI по умолчанию создает изображение; --no-open не открывает GUI."""
+        try:
+            graphviz_executable()
+        except ValueError:
+            self.skipTest("Graphviz не установлен")
+        result = subprocess.run(
+            [sys.executable, "-X", "utf8", "-m", "src", "--package", "A",
+             "--repository", "examples/cycle.json", "--test-mode",
+             "--output", str(self.output), "--no-open"],
+            cwd=Path(__file__).resolve().parents[1], capture_output=True,
+            text=True, encoding="utf-8", timeout=40, check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stderr, "")
+        self.assertIn(str(self.output), result.stdout)
+        self.assertTrue(self.output.read_bytes().startswith(b"\x89PNG"))
