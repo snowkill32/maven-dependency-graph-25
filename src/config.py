@@ -26,7 +26,6 @@ class Config:
     repository: str
     test_mode: bool = False
     ascii_tree: bool = False
-    load_order: bool = False
     output: str = "output/graph.png"
     no_open: bool = False
 

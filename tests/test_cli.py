@@ -125,34 +125,6 @@ class ConfigTests(unittest.TestCase):
         self.assertFalse(config.test_mode)
         self.assertFalse(config.ascii_tree)
 
-    def test_load_order_mode(self):
-        """Режим этапа 4 ставит общие зависимости раньше их потребителей."""
-        self.repository.write_text(
-            '{"A":["B","C"],"B":["D"],"C":["D"],"D":[]}',
-            encoding="utf-8",
-        )
-        output = StringIO()
-        with redirect_stdout(output):
-            result = main(self.test_args + ["--load-order"])
-        self.assertEqual(result, 0)
-        self.assertEqual(output.getvalue(),
-                         "Порядок загрузки: D -> B -> C -> A\n")
-
-    def test_load_order_cycle(self):
-        """Цикл не выдается за допустимый порядок загрузки."""
-        self.repository.write_text('{"A":["A"]}', encoding="utf-8")
-        output, errors = StringIO(), StringIO()
-        with redirect_stdout(output), redirect_stderr(errors):
-            result = main(self.test_args + ["--load-order"])
-        self.assertEqual(result, 1)
-        self.assertEqual(output.getvalue(), "")
-        self.assertIn("цикл A -> A", errors.getvalue())
-
-    def test_output_modes_are_exclusive(self):
-        """Порядок загрузки и ASCII-дерево выбираются раздельно."""
-        self.assert_error(self.test_args + ["--load-order", "--ascii-tree"],
-                          "--ascii-tree")
-
     def test_output_path_and_no_open(self):
         """Путь передается рендереру, окно можно отключить для сервера."""
         with redirect_stdout(StringIO()):
@@ -280,8 +252,7 @@ class ConfigTests(unittest.TestCase):
 
     def test_boolean_flags_reject_values(self):
         """Флаги включаются присутствием и не принимают true или false."""
-        for option in ("--test-mode", "--ascii-tree", "--load-order",
-                       "--no-open"):
+        for option in ("--test-mode", "--ascii-tree", "--no-open"):
             for value in ("true", "false"):
                 with self.subTest(option=option, value=value):
                     self.assert_error(
@@ -301,5 +272,5 @@ class ConfigTests(unittest.TestCase):
             main(["--help"])
         self.assertEqual(raised.exception.code, 0)
         for option in ("--package", "--repository", "--test-mode",
-                       "--ascii-tree", "--load-order", "--output", "--no-open"):
+                       "--ascii-tree", "--output", "--no-open"):
             self.assertIn(option, output.getvalue())

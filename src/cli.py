@@ -1,4 +1,4 @@
-"""CLI анализа Maven, порядка загрузки и визуализации графа зависимостей."""
+"""CLI анализа Maven и визуализации графа зависимостей."""
 
 import argparse
 from collections.abc import Sequence
@@ -7,7 +7,6 @@ import sys
 from .config import Config, validate_config
 from .graph import format_graph
 from .local_repository import get_test_graph
-from .order import format_load_order
 from .repository import get_dependency_graph
 from .visualization import open_graph, render_graph
 
@@ -16,7 +15,7 @@ def build_parser() -> argparse.ArgumentParser:
     """Описать две обязательные строковые настройки и два флага."""
     parser = argparse.ArgumentParser(
         prog="maven-dependency-graph",
-        description="Вариант 25: граф Maven, порядок загрузки и Graphviz.",
+        description="Вариант 25: граф Maven, Graphviz и ASCII-дерево.",
         allow_abbrev=False,
     )
     parser.add_argument(
@@ -36,15 +35,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def add_output_options(parser: argparse.ArgumentParser) -> None:
-    """Описать режимы ASCII и порядка загрузки, путь и открытие картинки."""
-    mode = parser.add_mutually_exclusive_group()
-    mode.add_argument(
+    """Описать режим ASCII, путь и открытие картинки."""
+    parser.add_argument(
         "--ascii-tree", action="store_true",
         help="использовать ASCII-символы вместо линий Unicode в схеме",
-    )
-    mode.add_argument(
-        "--load-order", action="store_true",
-        help="показать порядок загрузки: сначала зависимости, затем пакет",
     )
     parser.add_argument(
         "--output", default="output/graph.png",
@@ -65,7 +59,6 @@ def parse_config(argv: Sequence[str] | None = None) -> Config:
         repository=arguments.repository,
         test_mode=arguments.test_mode,
         ascii_tree=arguments.ascii_tree,
-        load_order=arguments.load_order,
         output=arguments.output,
         no_open=arguments.no_open,
     )
@@ -78,8 +71,6 @@ def parse_config(argv: Sequence[str] | None = None) -> Config:
 
 def display_result(config: Config, graph: dict) -> str:
     """Выбрать текстовый режим или сохранить и открыть изображение Graphviz."""
-    if config.load_order:
-        return format_load_order(config.package, graph)
     if config.ascii_tree:
         return format_graph(config.package, graph, True)
     image = render_graph(config.package, graph, config.output)
